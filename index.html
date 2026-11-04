@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dither-Werkstatt</title>
+<meta name="description" content="1-Bit- und ASCII-Editor im Browser: Bilder in Braille, Blöcke oder ASCII umrechnen, von Hand weiterzeichnen und als PNG, SVG oder Text exportieren.">
+<meta name="theme-color" content="#10112c">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="https://hjorven.github.io/" title="Zum Portfolio">Hjorven</a>
+  <h1>Dither-Werkstatt</h1>
+  <span class="sub">1-Bit- und ASCII-Editor</span>
+</header>
+
+<main class="app">
+  <section class="work" aria-label="Zeichenfläche">
+    <div class="tools" role="toolbar" aria-label="Werkzeuge">
+      <div class="group" id="toolGroup">
+        <button type="button" class="tool" data-tool="pen" title="Stift (B)" aria-pressed="true">
+          <svg viewBox="0 0 16 16"><path d="M2 14l1-4 8-8 3 3-8 8zM10 3l3 3"/></svg><span>Stift</span></button>
+        <button type="button" class="tool" data-tool="erase" title="Radierer (E)">
+          <svg viewBox="0 0 16 16"><path d="M6 14h8M2 10l6-6 5 5-5 5H6z"/></svg><span>Radierer</span></button>
+        <button type="button" class="tool" data-tool="line" title="Linie (L)">
+          <svg viewBox="0 0 16 16"><path d="M2 14L14 2"/></svg><span>Linie</span></button>
+        <button type="button" class="tool" data-tool="rect" title="Rechteck (R)">
+          <svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v9h-11z"/></svg><span>Rechteck</span></button>
+        <button type="button" class="tool" data-tool="fill" title="Füllen (F)">
+          <svg viewBox="0 0 16 16"><path d="M3 8l5-5 5 5-5 5zM13 11c1 1.5 1 3 0 3s-1-1.5 0-3z"/></svg><span>Füllen</span></button>
+        <button type="button" class="tool" data-tool="text" title="Text (T)">
+          <svg viewBox="0 0 16 16"><path d="M3 3h10M8 3v11M6 14h4"/></svg><span>Text</span></button>
+        <button type="button" class="tool" data-tool="pick" title="Pipette (I)">
+          <svg viewBox="0 0 16 16"><path d="M2 14l1-3 6-6 2 2-6 6zM9 5l2-3 3 3-3 2z"/></svg><span>Pipette</span></button>
+        <button type="button" class="tool" data-tool="pan" title="Verschieben (H)">
+          <svg viewBox="0 0 16 16"><path d="M8 1v14M1 8h14M8 1L6 3M8 1l2 2M8 15l-2-2M8 15l2-2M1 8l2-2M1 8l2 2M15 8l-2-2M15 8l-2 2"/></svg><span>Verschieben</span></button>
+      </div>
+      <div class="group">
+        <button type="button" class="tool" id="undo" title="Rückgängig (Strg+Z)">
+          <svg viewBox="0 0 16 16"><path d="M5 3L2 6l3 3M2 6h8a4 4 0 010 8H7"/></svg><span>Zurück</span></button>
+        <button type="button" class="tool" id="redo" title="Wiederholen (Strg+Umschalt+Z)">
+          <svg viewBox="0 0 16 16"><path d="M11 3l3 3-3 3M14 6H6a4 4 0 000 8h3"/></svg><span>Vor</span></button>
+      </div>
+      <div class="group zoom">
+        <button type="button" class="tool small" id="zoomOut" title="Verkleinern (-)">&minus;</button>
+        <button type="button" class="tool small wide" id="zoomFit" title="Einpassen (0)"><span id="zoomLabel">100 %</span></button>
+        <button type="button" class="tool small" id="zoomIn" title="Vergrößern (+)">+</button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="paper" id="paper">
+        <canvas id="cv" aria-label="Zeichenfläche"></canvas>
+        <canvas id="ov" aria-hidden="true"></canvas>
+      </div>
+      <div class="drop" id="drop" hidden><span>Bild loslassen</span></div>
+    </div>
+
+    <div class="status" id="status">
+      <span id="stSize">0 × 0</span>
+      <span id="stSet">Braille</span>
+      <span id="stPos">–</span>
+      <span id="stHint" class="hint"></span>
+    </div>
+  </section>
+
+  <aside class="panel" aria-label="Einstellungen">
+    <section class="box">
+      <h2><span>I</span>Bild</h2>
+      <div class="row2">
+        <label class="btn primary file">Bild öffnen<input type="file" id="file" accept="image/*"></label>
+        <button type="button" class="btn" id="demo">Beispiel</button>
+      </div>
+      <p class="note" id="imgNote">Auch per Ziehen und Ablegen oder Einfügen (Strg+V).</p>
+      <label class="field">Breite in Zeichen <output id="oCols">100</output>
+        <input type="range" id="imgCols" min="16" max="300" value="100"></label>
+      <label class="field">Verfahren
+        <select id="algo">
+          <option value="atkinson">Atkinson</option>
+          <option value="floyd">Floyd-Steinberg</option>
+          <option value="bayer8">Bayer 8 × 8</option>
+          <option value="bayer4">Bayer 4 × 4</option>
+          <option value="cluster">Punktraster</option>
+          <option value="lines">Linienraster</option>
+          <option value="random">Rauschen</option>
+          <option value="threshold">Schwelle</option>
+        </select></label>
+      <label class="field">Helligkeit <output id="oBright">0</output>
+        <input type="range" id="bright" min="-100" max="100" value="0"></label>
+      <label class="field">Kontrast <output id="oContrast">0</output>
+        <input type="range" id="contrast" min="-100" max="100" value="0"></label>
+      <label class="field">Gamma <output id="oGamma">1.00</output>
+        <input type="range" id="gamma" min="20" max="300" value="100"></label>
+      <label class="check"><input type="checkbox" id="invert"> Invertieren</label>
+      <p class="note">Die Regler rechnen das Bild neu. Was du darauf gezeichnet hast, holst du mit Zurück wieder.</p>
+    </section>
+
+    <section class="box">
+      <h2><span>II</span>Zeichensatz</h2>
+      <div class="sets" id="sets" role="radiogroup" aria-label="Zeichensatz"></div>
+    </section>
+
+    <section class="box">
+      <h2><span>III</span>Pinsel</h2>
+      <div class="seg" role="radiogroup" aria-label="Pinselart">
+        <button type="button" role="radio" data-brush="dot" aria-checked="true">Punkt</button>
+        <button type="button" role="radio" data-brush="char" aria-checked="false">Zeichen</button>
+      </div>
+      <p class="note" id="brushNote"></p>
+      <div class="chars" id="chars" role="radiogroup" aria-label="Zeichen"></div>
+      <label class="field inline">Eigenes Zeichen <input type="text" id="customChar" maxlength="2" placeholder="z. B. ☼"></label>
+    </section>
+
+    <section class="box">
+      <h2><span>IV</span>Farben</h2>
+      <div class="presets" id="presets"></div>
+      <div class="row2">
+        <label class="color">Tinte <input type="color" id="fg" value="#e9ebfb"></label>
+        <label class="color">Grund <input type="color" id="bg" value="#10112c"></label>
+      </div>
+    </section>
+
+    <section class="box">
+      <h2><span>V</span>Leinwand</h2>
+      <div class="row2">
+        <label class="field">Breite <input type="number" id="cols" min="4" max="300" value="100"></label>
+        <label class="field">Höhe <input type="number" id="rows" min="2" max="200" value="40"></label>
+      </div>
+      <div class="row2">
+        <button type="button" class="btn" id="resize">Größe ändern</button>
+        <button type="button" class="btn" id="clear">Leeren</button>
+      </div>
+    </section>
+
+    <section class="box">
+      <h2><span>VI</span>Export</h2>
+      <div class="row2">
+        <button type="button" class="btn primary" id="copyTxt">Text kopieren</button>
+        <button type="button" class="btn" id="saveTxt">.txt</button>
+      </div>
+      <div class="row2">
+        <button type="button" class="btn" id="savePng">.png</button>
+        <button type="button" class="btn" id="saveSvg">.svg</button>
+      </div>
+      <label class="field inline">PNG-Maßstab
+        <select id="pngScale"><option value="1">1 ×</option><option value="2" selected>2 ×</option><option value="4">4 ×</option></select></label>
+    </section>
+
+    <p class="foot">Alles läuft lokal im Browser, kein Bild verlässt dein Gerät. Die Zeichnung wird automatisch in diesem Browser gespeichert.
+      <a href="https://github.com/hjorven/dither-werkstatt">Quellcode</a></p>
+  </aside>
+</main>
+
+<input id="kbd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Texteingabe">
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
